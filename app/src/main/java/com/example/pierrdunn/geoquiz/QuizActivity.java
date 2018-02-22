@@ -2,6 +2,8 @@ package com.example.pierrdunn.geoquiz;
 
 //Субкласс, наследующийся от класса Android Activity и обеспечиващий
 //поддержку старых версий Android.
+import android.app.Activity;
+import android.content.Intent;
 import android.os.PersistableBundle;
 import android.support.v7.app.AppCompatActivity;
 
@@ -14,6 +16,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CursorAdapter;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -26,13 +29,19 @@ public class QuizActivity extends AppCompatActivity {
     //Ключ для сохранения значения при изменении ориентации
     private static final String KEY_INDEX = "index";
 
+    //Код запроса активности CheatActivity
+    private static final int REQUEST_CODE_CHEAT = 0;
+
     private Button mTrueButton;
     private Button mFalseButton;
+    private Button mCheatButton;
     private ImageButton mNextButton;
     private ImageButton mBackButton;
     private TextView mQuestionTextView;
     private Question [] mQuestionBank;
     private int mCurrentIndex;
+
+    private boolean mIsCheater;
 
     private int truePercentage;
 
@@ -84,6 +93,7 @@ public class QuizActivity extends AppCompatActivity {
         //Buttons Next and Back
         mNextButton = (ImageButton) findViewById(R.id.next_button);
         mBackButton = (ImageButton) findViewById(R.id.back_button);
+        mCheatButton = (Button) findViewById(R.id.cheat_button);
 
         mNextButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -92,6 +102,7 @@ public class QuizActivity extends AppCompatActivity {
                 mFalseButton.setEnabled(true);
                 if(mCurrentIndex < mQuestionBank.length - 1){
                     mCurrentIndex = (mCurrentIndex + 1) % mQuestionBank.length;
+                    mIsCheater = false;
                     updateQuestion();
                 }
                 else
@@ -106,8 +117,19 @@ public class QuizActivity extends AppCompatActivity {
                 mFalseButton.setEnabled(true);
                 if(mCurrentIndex != 0) {
                     mCurrentIndex = (mCurrentIndex - 1) % mQuestionBank.length;
+                    mIsCheater = false;
                     updateQuestion();
                 }
+            }
+        });
+
+        mCheatButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean answerIsTrue = mQuestionBank[mCurrentIndex].isAnswerTrue();
+                Intent intent = CheatActivity.newIntent(QuizActivity.this, answerIsTrue);
+                //startActivity(intent);
+                startActivityForResult(intent, REQUEST_CODE_CHEAT);
             }
         });
 
@@ -131,6 +153,18 @@ public class QuizActivity extends AppCompatActivity {
                 checkAnswer(false);
             }
         });
+    }
+
+    //Получение результата об открытии activity_cheat
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if(resultCode != Activity.RESULT_OK)
+            return;
+        if(requestCode == REQUEST_CODE_CHEAT){
+            if(data == null)
+                return;
+            mIsCheater = CheatActivity.wasAnswerShown(data);
+        }
     }
 
     //Переопределение метода для сохранения ключа между орентациями
@@ -181,12 +215,17 @@ public class QuizActivity extends AppCompatActivity {
 
         int messageResId = 0;
 
-        if(userPressedTrue == answerIsTrue){
-            messageResId = R.string.correct_toast;
-            truePercentage++;
+        if(mIsCheater){
+            messageResId = R.string.judgment_toast;
         }
         else{
-            messageResId = R.string.incorrect_toast;
+            if(userPressedTrue == answerIsTrue){
+                messageResId = R.string.correct_toast;
+                truePercentage++;
+            }
+            else{
+                messageResId = R.string.incorrect_toast;
+            }
         }
 
         toast = Toast.makeText(this, messageResId,
